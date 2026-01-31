@@ -6,7 +6,7 @@ ENV PATH="/root/.bun/bin:${PATH}"
 
 RUN corepack enable
 
-RUN apt-get update && apt-get install -y socat && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y socat libasound2 && rm -rf /var/lib/apt/lists/*
 
 # Gmail CLI
 RUN curl -L https://github.com/steipete/gogcli/releases/download/v0.9.0/gogcli_0.9.0_linux_arm64.tar.gz \
