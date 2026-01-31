@@ -16,6 +16,9 @@ RUN curl -L https://github.com/steipete/gogcli/releases/download/v0.9.0/gogcli_0
 RUN curl -L https://github.com/steipete/goplaces/releases/download/v0.2.1/goplaces_0.2.1_darwin_arm64.tar.gz \
   | tar -xz -C /usr/local/bin && chmod +x /usr/local/bin/goplaces
 
+# ElevenLabs CLI (Sag)
+RUN curl -L https://github.com/Yeboster/sag/releases/download/v0.23.4/sag_0.23.4_linux_arm64.tar.gz \
+  | tar -xz -C /usr/local/bin && chmod +x /usr/local/bin/sag
 
 # Install ClawdHub CLI (Skills) & MCPorter CLI (MPC)
 RUN npm install -g --prefix /usr/local clawdhub mcporter
