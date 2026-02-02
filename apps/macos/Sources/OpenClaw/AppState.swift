@@ -213,6 +213,10 @@ final class AppState {
         didSet { self.syncGatewayConfigIfNeeded() }
     }
 
+    var remoteToken: String {
+        didSet { self.syncGatewayConfigIfNeeded() }
+    }
+
     var remoteIdentity: String {
         didSet { self.ifNotPreview { UserDefaults.standard.set(self.remoteIdentity, forKey: remoteIdentityKey) } }
     }
@@ -282,6 +286,7 @@ final class AppState {
         let configRoot = OpenClawConfigFile.loadDict()
         let configRemoteUrl = GatewayRemoteConfig.resolveUrlString(root: configRoot)
         let configRemoteTransport = GatewayRemoteConfig.resolveTransport(root: configRoot)
+        let configRemoteToken = Self.resolveRemoteToken(root: configRoot)
         let resolvedConnectionMode = ConnectionModeResolver.resolve(root: configRoot).mode
         self.remoteTransport = configRemoteTransport
         self.connectionMode = resolvedConnectionMode
@@ -297,6 +302,7 @@ final class AppState {
             self.remoteTarget = storedRemoteTarget
         }
         self.remoteUrl = configRemoteUrl ?? ""
+        self.remoteToken = configRemoteToken
         self.remoteIdentity = UserDefaults.standard.string(forKey: remoteIdentityKey) ?? ""
         self.remoteProjectRoot = UserDefaults.standard.string(forKey: remoteProjectRootKey) ?? ""
         self.remoteCliPath = UserDefaults.standard.string(forKey: remoteCliPathKey) ?? ""
@@ -356,6 +362,16 @@ final class AppState {
         return trimmed
     }
 
+    private static func resolveRemoteToken(root: [String: Any]) -> String {
+        guard let gateway = root["gateway"] as? [String: Any],
+              let remote = gateway["remote"] as? [String: Any],
+              let token = remote["token"] as? String
+        else {
+            return ""
+        }
+        return token.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func startConfigWatcher() {
         let configUrl = OpenClawConfigFile.url()
         self.configWatcher = ConfigFileWatcher(url: configUrl) { [weak self] in
@@ -379,6 +395,7 @@ final class AppState {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .isEmpty ?? true)
         let remoteTransport = GatewayRemoteConfig.resolveTransport(root: root)
+        let remoteToken = Self.resolveRemoteToken(root: root)
 
         let desiredMode: ConnectionMode? = switch modeRaw {
         case "local":
@@ -405,6 +422,9 @@ final class AppState {
         let remoteUrlText = remoteUrl ?? ""
         if remoteUrlText != self.remoteUrl {
             self.remoteUrl = remoteUrlText
+        }
+        if remoteToken != self.remoteToken {
+            self.remoteToken = remoteToken
         }
 
         let targetMode = desiredMode ?? self.connectionMode
@@ -441,6 +461,7 @@ final class AppState {
         let remoteIdentity = self.remoteIdentity
         let remoteTransport = self.remoteTransport
         let remoteUrl = self.remoteUrl
+        let remoteToken = self.remoteToken
         let desiredMode: String? = switch connectionMode {
         case .local:
             "local"
@@ -531,6 +552,17 @@ final class AppState {
                         remote.removeValue(forKey: "sshIdentity")
                         remoteChanged = true
                     }
+                }
+
+                let trimmedToken = remoteToken.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmedToken.isEmpty {
+                    if (remote["token"] as? String) != trimmedToken {
+                        remote["token"] = trimmedToken
+                        remoteChanged = true
+                    }
+                } else if remote["token"] != nil {
+                    remote.removeValue(forKey: "token")
+                    remoteChanged = true
                 }
 
                 if remoteChanged {
@@ -688,6 +720,7 @@ extension AppState {
         state.canvasEnabled = true
         state.remoteTarget = "user@example.com"
         state.remoteUrl = "wss://gateway.example.ts.net"
+        state.remoteToken = "example-token"
         state.remoteIdentity = "~/.ssh/id_ed25519"
         state.remoteProjectRoot = "~/Projects/openclaw"
         state.remoteCliPath = ""
