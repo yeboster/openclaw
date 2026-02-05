@@ -30,7 +30,7 @@ RUN curl -L https://github.com/Yakitrak/obsidian-cli/releases/download/v0.2.3/ob
 
 # Github
 RUN curl -L https://github.com/cli/cli/releases/download/v2.86.0/gh_2.86.0_linux_arm64.tar.gz \
-  | tar -xz -C /usr/local/bin && chmod +x /usr/local/bin/gh
+  | tar -xz --strip-components=2 -C /usr/local/bin gh_2.86.0_linux_arm64/bin/gh && chmod +x /usr/local/bin/gh
 
 # Install ClawdHub CLI (Skills) & MCPorter CLI (MPC)
 RUN npm install -g --prefix /usr/local clawdhub mcporter
