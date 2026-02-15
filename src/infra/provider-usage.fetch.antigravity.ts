@@ -39,18 +39,9 @@ const BASE_URL = "https://cloudcode-pa.googleapis.com";
 const LOAD_CODE_ASSIST_PATH = "/v1internal:loadCodeAssist";
 const FETCH_AVAILABLE_MODELS_PATH = "/v1internal:fetchAvailableModels";
 
-function resolvePlatform(): "WINDOWS" | "MACOS" | "LINUX" {
-  if (process.platform === "win32") {
-    return "WINDOWS";
-  }
-  if (process.platform === "linux") {
-    return "LINUX";
-  }
-  return "MACOS";
-}
-
-const METADATA_BASE = {
+const METADATA = {
   ideType: "ANTIGRAVITY",
+  platform: "PLATFORM_UNSPECIFIED",
   pluginType: "GEMINI",
 };
 
@@ -208,16 +199,11 @@ export async function fetchAntigravityUsage(
   timeoutMs: number,
   fetchFn: typeof fetch,
 ): Promise<ProviderUsageSnapshot> {
-  const metadata = {
-    ...METADATA_BASE,
-    platform: resolvePlatform(),
-  };
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
     "User-Agent": "antigravity",
-    "X-Goog-Api-Client": "gl-node/22.17.0",
-    "Client-Metadata": JSON.stringify(metadata),
+    "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
   };
 
   let credits: CreditsInfo | undefined;
@@ -230,7 +216,7 @@ export async function fetchAntigravityUsage(
   try {
     const res = await fetchJson(
       `${BASE_URL}${LOAD_CODE_ASSIST_PATH}`,
-      { method: "POST", headers, body: JSON.stringify({ metadata }) },
+      { method: "POST", headers, body: JSON.stringify({ metadata: METADATA }) },
       timeoutMs,
       fetchFn,
     );

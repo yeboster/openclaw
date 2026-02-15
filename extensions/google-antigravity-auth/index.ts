@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import {
+  buildOauthProviderAuthResult,
   emptyPluginConfigSchema,
   isWSL2Sync,
   type OpenClawPluginApi,
@@ -18,7 +19,6 @@ const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DEFAULT_PROJECT_ID = "rising-fact-p41fc";
 const DEFAULT_MODEL = "google-antigravity/claude-opus-4-6-thinking";
-const DEFAULT_FETCH_TIMEOUT_MS = 10_000;
 
 const SCOPES = [
   "https://www.googleapis.com/auth/cloud-platform",
@@ -28,14 +28,9 @@ const SCOPES = [
   "https://www.googleapis.com/auth/experimentsandconfigs",
 ];
 
-const CODE_ASSIST_ENDPOINT_PROD = "https://cloudcode-pa.googleapis.com";
-const CODE_ASSIST_ENDPOINT_DAILY = "https://daily-cloudcode-pa.sandbox.googleapis.com";
-const CODE_ASSIST_ENDPOINT_AUTOPUSH = "https://autopush-cloudcode-pa.sandbox.googleapis.com";
-
-const LOAD_CODE_ASSIST_ENDPOINTS = [
-  CODE_ASSIST_ENDPOINT_PROD,
-  CODE_ASSIST_ENDPOINT_DAILY,
-  CODE_ASSIST_ENDPOINT_AUTOPUSH,
+const CODE_ASSIST_ENDPOINTS = [
+  "https://cloudcode-pa.googleapis.com",
+  "https://daily-cloudcode-pa.sandbox.googleapis.com",
 ];
 
 const RESPONSE_PAGE = `<!DOCTYPE html>
@@ -95,31 +90,6 @@ function parseCallbackInput(input: string): { code: string; state: string } | { 
     return { code, state };
   } catch {
     return { error: "Paste the full redirect URL (not just the code)." };
-  }
-}
-
-function resolvePlatform(): "WINDOWS" | "MACOS" | "LINUX" {
-  if (process.platform === "win32") {
-    return "WINDOWS";
-  }
-  if (process.platform === "linux") {
-    return "LINUX";
-  }
-  return "MACOS";
-}
-
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
-) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  timeout.unref?.();
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -201,26 +171,18 @@ async function exchangeCode(params: {
   code: string;
   verifier: string;
 }): Promise<{ access: string; refresh: string; expires: number }> {
-  const response = await fetchWithTimeout(
-    TOKEN_URL,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-        Accept: "*/*",
-        "User-Agent": "google-api-nodejs-client/9.15.1",
-      },
-      body: new URLSearchParams({
-        client_id: CLIENT_ID,
-        client_secret: CLIENT_SECRET,
-        code: params.code,
-        grant_type: "authorization_code",
-        redirect_uri: REDIRECT_URI,
-        code_verifier: params.verifier,
-      }),
-    },
-    DEFAULT_FETCH_TIMEOUT_MS,
-  );
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID,
+      client_secret: CLIENT_SECRET,
+      code: params.code,
+      grant_type: "authorization_code",
+      redirect_uri: REDIRECT_URI,
+      code_verifier: params.verifier,
+    }),
+  });
 
   if (!response.ok) {
     const text = await response.text();
@@ -250,13 +212,9 @@ async function exchangeCode(params: {
 
 async function fetchUserEmail(accessToken: string): Promise<string | undefined> {
   try {
-    const response = await fetchWithTimeout(
-      "https://www.googleapis.com/oauth2/v1/userinfo?alt=json",
-      {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      },
-      DEFAULT_FETCH_TIMEOUT_MS,
-    );
+    const response = await fetch("https://www.googleapis.com/oauth2/v1/userinfo?alt=json", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
     if (!response.ok) {
       return undefined;
     }
@@ -268,39 +226,31 @@ async function fetchUserEmail(accessToken: string): Promise<string | undefined> 
 }
 
 async function fetchProjectId(accessToken: string): Promise<string> {
-  const envProject = process.env.GOOGLE_CLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT_ID;
-  const platform = resolvePlatform();
   const headers = {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
     "User-Agent": "google-api-nodejs-client/9.15.1",
-    "X-Goog-Api-Client": "gl-node/22.17.0",
+    "X-Goog-Api-Client": "google-cloud-sdk vscode_cloudshelleditor/0.1",
     "Client-Metadata": JSON.stringify({
-      ideType: "ANTIGRAVITY",
-      platform,
+      ideType: "IDE_UNSPECIFIED",
+      platform: "PLATFORM_UNSPECIFIED",
       pluginType: "GEMINI",
     }),
   };
 
-  for (const endpoint of LOAD_CODE_ASSIST_ENDPOINTS) {
+  for (const endpoint of CODE_ASSIST_ENDPOINTS) {
     try {
-      const response = await fetchWithTimeout(
-        `${endpoint}/v1internal:loadCodeAssist`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            ...(envProject ? { cloudaicompanionProject: envProject } : {}),
-            metadata: {
-              ideType: "ANTIGRAVITY",
-              platform,
-              pluginType: "GEMINI",
-              ...(envProject ? { duetProject: envProject } : {}),
-            },
-          }),
-        },
-        DEFAULT_FETCH_TIMEOUT_MS,
-      );
+      const response = await fetch(`${endpoint}/v1internal:loadCodeAssist`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          metadata: {
+            ideType: "IDE_UNSPECIFIED",
+            platform: "PLATFORM_UNSPECIFIED",
+            pluginType: "GEMINI",
+          },
+        }),
+      });
 
       if (!response.ok) {
         continue;
@@ -324,7 +274,7 @@ async function fetchProjectId(accessToken: string): Promise<string> {
     }
   }
 
-  return envProject || DEFAULT_PROJECT_ID;
+  return DEFAULT_PROJECT_ID;
 }
 
 async function loginAntigravity(params: {
@@ -447,37 +397,19 @@ const antigravityPlugin = {
                 progress: spin,
               });
 
-              const profileId = `google-antigravity:${result.email ?? "default"}`;
-              return {
-                profiles: [
-                  {
-                    profileId,
-                    credential: {
-                      type: "oauth",
-                      provider: "google-antigravity",
-                      access: result.access,
-                      refresh: result.refresh,
-                      expires: result.expires,
-                      email: result.email,
-                      projectId: result.projectId,
-                    },
-                  },
-                ],
-                configPatch: {
-                  agents: {
-                    defaults: {
-                      models: {
-                        [DEFAULT_MODEL]: {},
-                      },
-                    },
-                  },
-                },
+              return buildOauthProviderAuthResult({
+                providerId: "google-antigravity",
                 defaultModel: DEFAULT_MODEL,
+                access: result.access,
+                refresh: result.refresh,
+                expires: result.expires,
+                email: result.email,
+                credentialExtra: { projectId: result.projectId },
                 notes: [
                   "Antigravity uses Google Cloud project quotas.",
                   "Enable Gemini for Google Cloud on your project if requests fail.",
                 ],
-              };
+              });
             } catch (err) {
               spin.stop("Antigravity OAuth failed");
               throw err;
