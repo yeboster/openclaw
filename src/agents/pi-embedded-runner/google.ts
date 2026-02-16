@@ -245,7 +245,11 @@ export function sanitizeToolsForGoogle<
   tools: AgentTool<TSchemaType, TResult>[];
   provider: string;
 }): AgentTool<TSchemaType, TResult>[] {
-  if (params.provider !== "google-antigravity" && params.provider !== "google-gemini-cli") {
+  if (
+    params.provider !== "google-antigravity" &&
+    params.provider !== "google-gemini-cli" &&
+    params.provider !== "google"
+  ) {
     return params.tools;
   }
   return params.tools.map((tool) => {
@@ -262,7 +266,11 @@ export function sanitizeToolsForGoogle<
 }
 
 export function logToolSchemasForGoogle(params: { tools: AgentTool[]; provider: string }) {
-  if (params.provider !== "google-antigravity" && params.provider !== "google-gemini-cli") {
+  if (
+    params.provider !== "google-antigravity" &&
+    params.provider !== "google-gemini-cli" &&
+    params.provider !== "google"
+  ) {
     return;
   }
   const toolNames = params.tools.map((tool, index) => `${index}:${tool.name}`);
