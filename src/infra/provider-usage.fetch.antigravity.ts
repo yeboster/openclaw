@@ -1,6 +1,6 @@
 import type { ProviderUsageSnapshot, UsageWindow } from "./provider-usage.types.js";
 import { logDebug } from "../logger.js";
-import { fetchJson } from "./provider-usage.fetch.shared.js";
+import { fetchJson, parseFiniteNumber } from "./provider-usage.fetch.shared.js";
 import { clampPercent, PROVIDER_LABELS } from "./provider-usage.shared.js";
 
 type LoadCodeAssistResponse = {
@@ -55,16 +55,7 @@ const METADATA_BASE = {
 };
 
 function parseNumber(value: number | string | undefined): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Number.parseFloat(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return undefined;
+  return parseFiniteNumber(value);
 }
 
 function parseEpochMs(isoString: string | undefined): number | undefined {

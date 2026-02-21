@@ -46,7 +46,6 @@ jobs:
       contents: read
     outputs:
       image-digest: ${{ steps.build.outputs.digest }}
-      image-metadata: ${{ steps.meta.outputs.json }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -91,12 +90,15 @@ jobs:
 
   # Create multi-platform manifest
   create-manifest:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-16vcpu-ubuntu-2404
     permissions:
       packages: write
       contents: read
     needs: [version, build-arm64]
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -115,9 +117,15 @@ jobs:
             type=semver,pattern={{version}}
 
       - name: Create and push manifest
+        shell: bash
         run: |
-          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          set -euo pipefail
+          mapfile -t tags <<< "${{ steps.tags.outputs.value }}"
+          args=()
+          for tag in "${tags[@]}"; do
+            [ -z "$tag" ] && continue
+            args+=("-t" "$tag")
+          done
+          docker buildx imagetools create "${args[@]}" \
             ${{ needs.build-amd64.outputs.image-digest }} \
             ${{ needs.build-arm64.outputs.image-digest }}
-        env:
-          DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta.outputs.json }}

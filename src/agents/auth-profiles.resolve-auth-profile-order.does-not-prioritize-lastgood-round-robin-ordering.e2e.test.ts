@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { AuthProfileStore } from "./auth-profiles/types.js";
 import { resolveAuthProfileOrder } from "./auth-profiles.js";
 
 describe("resolveAuthProfileOrder", () => {
@@ -54,7 +55,7 @@ describe("resolveAuthProfileOrder", () => {
       cfg: {
         auth: {
           order: { anthropic: ["anthropic:work", "anthropic:default"] },
-          profiles: cfg.auth.profiles,
+          profiles: cfg.auth?.profiles,
         },
       },
       store,
@@ -67,7 +68,7 @@ describe("resolveAuthProfileOrder", () => {
       cfg: {
         auth: {
           order: { anthropic: ["anthropic:default", "anthropic:work"] },
-          profiles: cfg.auth.profiles,
+          profiles: cfg.auth?.profiles,
         },
       },
       store: {
@@ -99,7 +100,7 @@ describe("resolveAuthProfileOrder", () => {
       cfg: {
         auth: {
           order: { anthropic: ["anthropic:default", "anthropic:work"] },
-          profiles: cfg.auth.profiles,
+          profiles: cfg.auth?.profiles,
         },
       },
       store: {
@@ -137,7 +138,7 @@ describe("resolveAuthProfileOrder", () => {
       cfg: {
         auth: {
           order: { anthropic: ["anthropic:default", "anthropic:work"] },
-          profiles: cfg.auth.profiles,
+          profiles: cfg.auth?.profiles,
         },
       },
       store: {

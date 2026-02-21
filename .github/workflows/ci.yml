@@ -56,7 +56,7 @@ jobs:
   release-check:
     needs: [docs-scope, install-check]
     if: github.event_name == 'push' && needs.docs-scope.outputs.docs_only != 'true'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-16vcpu-ubuntu-2404
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -93,20 +93,28 @@ jobs:
             task: test
             command: pnpm canvas:a2ui:bundle && bunx vitest run --config vitest.unit.config.ts
     steps:
+      - name: Skip bun lane on push
+        if: github.event_name == 'push' && matrix.runtime == 'bun'
+        run: echo "Skipping bun test lane on push events."
+
       - name: Checkout
+        if: github.event_name != 'push' || matrix.runtime != 'bun'
         uses: actions/checkout@v4
         with:
           submodules: false
 
       - name: Setup Node environment
+        if: matrix.runtime != 'bun' || github.event_name != 'push'
         uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "${{ matrix.runtime == 'bun' }}"
 
       - name: Configure vitest JSON reports
-        if: matrix.task == 'test' && matrix.runtime == 'node'
+        if: (github.event_name != 'push' || matrix.runtime != 'bun') && matrix.task == 'test' && matrix.runtime == 'node'
         run: echo "OPENCLAW_VITEST_REPORT_DIR=$RUNNER_TEMP/vitest-reports" >> "$GITHUB_ENV"
 
       - name: Configure Node test resources
-        if: matrix.task == 'test' && matrix.runtime == 'node'
+        if: (github.event_name != 'push' || matrix.runtime != 'bun') && matrix.task == 'test' && matrix.runtime == 'node'
         run: |
           # `pnpm test` runs `scripts/test-parallel.mjs`, which spawns multiple Node processes.
           # Default heap limits have been too low on Linux CI (V8 OOM near 4GB).
@@ -114,6 +122,7 @@ jobs:
           echo "OPENCLAW_TEST_MAX_OLD_SPACE_SIZE_MB=6144" >> "$GITHUB_ENV"
 
       - name: Run ${{ matrix.task }} (${{ matrix.runtime }})
+        if: matrix.runtime != 'bun' || github.event_name != 'push'
         run: ${{ matrix.command }}
 
   macos-app:
