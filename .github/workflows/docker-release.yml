@@ -90,7 +90,7 @@ jobs:
 
   # Create multi-platform manifest
   create-manifest:
-    runs-on: blacksmith-16vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     permissions:
       packages: write
       contents: read
